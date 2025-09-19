@@ -1,0 +1,157 @@
+-- SQLBook: Code
+-- -- Create medication_stock table
+-- CREATE TABLE medication_stock (
+--     medication_id INT PRIMARY KEY,
+--     medication_name VARCHAR(100) NOT NULL,
+--     quantity INT NOT NULL
+-- );
+
+-- -- Insert sample values
+-- INSERT INTO medication_stock (medication_id, medication_name, quantity) VALUES
+-- (1, 'Paracetamol', 150),
+-- (2, 'Ibuprofen', 75),
+-- (3, 'Aspirin', 200),
+-- (4, 'Lisinopril', 50),
+-- (5, 'Metformin', 100),
+-- (6, 'Omeprazole', 30);
+
+
+
+-- Q1: List all patients name and ages
+SELECT name, age 
+FROM patients;
+
+-- Q2: List all doctors specializing in 'Cardiology'
+SELECT * 
+FROM doctors 
+WHERE specialization = 'Cardiology';
+
+-- Q3: Find all patients that are older than 80
+SELECT * 
+FROM patients 
+WHERE age > 80;
+
+-- Q4: List all the patients ordered by their age (youngest first)
+SELECT * 
+FROM patients 
+ORDER BY age ASC;
+
+-- Q5: Count the number of doctors in each specialization
+SELECT specialization, COUNT(*) AS doctor_count
+FROM doctors 
+GROUP BY specialization;
+
+-- Q6: List patients and their doctors' names
+SELECT p.name AS patient_name, d.name AS doctor_name
+FROM patients p
+JOIN doctors d ON p.doctor_id = d.doctor_id;
+
+-- Q7: Show treatments along with patient names and doctor names
+SELECT t.treatment_id, t.treatment_type, t.treatment_time,
+       p.name AS patient_name, d.name AS doctor_name
+FROM treatments t
+JOIN patients p ON t.patient_id = p.patient_id
+JOIN doctors d ON p.doctor_id = d.doctor_id;
+
+-- Q8: Count how many patients each doctor supervises
+SELECT d.doctor_id, d.name, COUNT(p.patient_id) AS patient_count
+FROM doctors d
+LEFT JOIN patients p ON d.doctor_id = p.doctor_id
+GROUP BY d.doctor_id, d.name;
+
+-- Q9: List the average age of patients and display it as average_age
+SELECT AVG(age) AS average_age
+FROM patients;
+
+-- Q10: Find the most common treatment type, and display only that
+SELECT treatment_type, COUNT(*) AS treatment_count
+FROM treatments
+GROUP BY treatment_type
+HAVING COUNT(*) = (
+    SELECT MAX(count) 
+    FROM (SELECT COUNT(*) AS count 
+          FROM treatments 
+          GROUP BY treatment_type) AS subquery
+);
+
+-- Q11: List patients who are older than the average age of all patients
+SELECT *
+FROM patients
+WHERE age > (SELECT AVG(age) FROM patients);
+
+-- Q12: List all the doctors who have more than 5 patients
+SELECT d.doctor_id, d.name, COUNT(p.patient_id) AS patient_count
+FROM doctors d
+JOIN patients p ON d.doctor_id = p.doctor_id
+GROUP BY d.doctor_id, d.name
+HAVING COUNT(p.patient_id) > 5;
+
+-- Q13: List all the treatments that are provided by nurses that work in the morning shift. List patient name as well.
+SELECT t.treatment_id, t.treatment_type, t.treatment_time,
+       p.name AS patient_name, n.name AS nurse_name
+FROM treatments t
+JOIN nurses n ON t.nurse_id = n.nurse_id
+JOIN patients p ON t.patient_id = p.patient_id
+WHERE n.shift = 'Morning';
+
+-- Q14: Find the latest treatment for each patient
+WITH latest_treatment AS (
+    SELECT patient_id, MAX(treatment_time) AS latest_time
+    FROM treatments
+    GROUP BY patient_id
+)
+SELECT t.patient_id, p.name, t.treatment_type, t.treatment_time
+FROM treatments t
+JOIN latest_treatment lt ON t.patient_id = lt.patient_id AND t.treatment_time = lt.latest_time
+JOIN patients p ON t.patient_id = p.patient_id;
+
+-- Q15: List all the doctors and average age of their patients
+SELECT d.doctor_id, d.name, AVG(p.age) AS average_patient_age
+FROM doctors d
+LEFT JOIN patients p ON d.doctor_id = p.doctor_id
+GROUP BY d.doctor_id, d.name;
+
+-- Q16: List the names of the doctors who supervise more than 3 patients
+SELECT d.name
+FROM doctors d
+JOIN patients p ON d.doctor_id = p.doctor_id
+GROUP BY d.doctor_id, d.name
+HAVING COUNT(p.patient_id) > 3;
+
+-- Q17: List all the patients who have not received any treatments
+SELECT *
+FROM patients
+WHERE patient_id NOT IN (SELECT DISTINCT patient_id FROM treatments);
+
+-- Q18: List all the medicines whose stock (quantity) is less than the average stock
+SELECT *
+FROM medication_stock
+WHERE quantity < (SELECT AVG(quantity) FROM medication_stock);
+
+-- Q19: For each doctor, rank their patients by age
+SELECT 
+    d.name AS doctor_name,
+    p.name AS patient_name,
+    p.age,
+    RANK() OVER (PARTITION BY d.doctor_id ORDER BY p.age DESC) AS age_rank
+FROM doctors d
+JOIN patients p ON d.doctor_id = p.doctor_id
+ORDER BY d.doctor_id, age_rank;
+
+-- Q20: For each specialization, find the doctor with the oldest patient
+WITH max_age_per_specialization AS (
+    SELECT 
+        d.specialization,
+        MAX(p.age) AS max_age
+    FROM doctors d
+    JOIN patients p ON d.doctor_id = p.doctor_id
+    GROUP BY d.specialization
+)
+SELECT 
+    mas.specialization,
+    d.name AS doctor_name,
+    p.name AS oldest_patient,
+    mas.max_age
+FROM max_age_per_specialization mas
+JOIN doctors d ON mas.specialization = d.specialization
+JOIN patients p ON d.doctor_id = p.doctor_id AND p.age = mas.max_age;
